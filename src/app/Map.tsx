@@ -2,33 +2,51 @@
 
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useContext, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditMap } from "./EditMap";
 import { AddElement } from "./AddElement";
+import { Sidebar } from "./Sidebar";
+
+export type markerItem = { id: string; marker: maplibregl.Marker };
 
 export default function Map() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maplibregl.Map | null>(null);
+  const [map, setMap] = useState<maplibregl.Map | null>(null);
+  const [markerList, setMarkerList] = useState<markerItem[]>([]); // track all markers
+
   useEffect(() => {
-    if (map.current) return;
+    if (map) return;
     if (!mapContainer.current) return;
-    map.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: "/map.json",
-      center: [9.993768, 53.552534],
-      zoom: 15,
-      attributionControl: false,
-    });
-    map.current.on("load", () => {
-      loadLineOverlay(map.current as maplibregl.Map);
-    });
+    setMap(
+      new maplibregl.Map({
+        container: mapContainer.current,
+        style: "/map.json",
+        center: [9.993768, 53.552534],
+        zoom: 15,
+        attributionControl: false,
+      }),
+    );
   }, []);
+
+  useEffect(() => {
+    if (!map) return;
+    map.on("load", () => {
+      loadLineOverlay(map);
+    });
+  }, [map]);
 
   return (
     <>
       <div className="flex max-w-3xl flex-row gap-4">
-        <EditMap map={map} />
-        <AddElement map={map} />
+        {map && <EditMap map={map} />}
+        {map && <AddElement map={map} setMarkerList={setMarkerList} />}
+        {map && (
+          <Sidebar
+            map={map}
+            markerList={markerList}
+            setMarkerList={setMarkerList}
+          />
+        )}
       </div>
       <div className="aspect-video w-full">
         <div ref={mapContainer} className="h-full w-full bg-red-600"></div>

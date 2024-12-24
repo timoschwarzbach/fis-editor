@@ -1,48 +1,65 @@
-import { MutableRefObject, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
-export function EditMap({
-  map,
-}: {
-  map: MutableRefObject<maplibregl.Map | null>;
-}) {
-  const zoomInput = useRef<HTMLInputElement>(null);
-  const latInput = useRef<HTMLInputElement>(null);
-  const lonInput = useRef<HTMLInputElement>(null);
+export function EditMap({ map }: { map: maplibregl.Map }) {
+  const [mapData, setMapData] = useState({
+    zoom: 0,
+    lat: 0,
+    lon: 0,
+    rotation: 0,
+    tilt: 0,
+  });
   useEffect(() => {
-    if (!map.current) return;
+    if (!map) return;
     const zoomListener = () => {
-      const input = zoomInput.current;
-      if (!input) return;
-      const zoom = map.current?.getZoom();
-      input.value = (zoom || input.value).toString();
+      const zoom = map.getZoom();
+      if (!zoom) return;
+      setMapData((mapData) => ({ ...mapData, zoom }));
     };
     const moveListener = () => {
-      const [lat, lon] = [latInput.current, lonInput.current];
-      if (!lat || !lon) return;
-      const postition = map.current?.getCenter();
-      lat.value = (postition?.lat || lat).toString();
-      lon.value = (postition?.lng || lon).toString();
+      const postition = map.getCenter();
+      if (!postition) return;
+      setMapData((mapData) => ({
+        ...mapData,
+        lat: postition.lat,
+        lon: postition.lng,
+      }));
     };
-    map.current.on("zoomend", zoomListener);
-    map.current.on("move", moveListener);
+    const rotationListener = () => {
+      const rotation = map.getBearing();
+      if (!rotation) return;
+      setMapData((mapData) => ({ ...mapData, rotation }));
+    };
+    const tiltListener = () => {
+      const tilt = map.getPitch();
+      if (!tilt) return;
+      setMapData((mapData) => ({ ...mapData, tilt }));
+    };
+    map.on("zoom", zoomListener);
+    map.on("move", moveListener);
+    map.on("rotate", rotationListener);
+    map.on("pitch", tiltListener);
+
+    // load initial values
+    zoomListener();
+    moveListener();
+    rotationListener();
+    tiltListener();
     return () => {
-      if (!map.current) return;
-      map.current.off("zoomend", zoomListener);
-      map.current.off("move", moveListener);
+      if (!map) return;
+      map.off("zoom", zoomListener);
+      map.off("move", moveListener);
+      map.off("rotate", rotationListener);
+      map.off("pitch", tiltListener);
     };
-  });
+  }, [map]);
 
   const onPositionInputBlur = () => {
-    const lat =
-      parseFloat(latInput.current?.value!) ||
-      map.current?.getCenter()?.lat ||
-      0;
-    const lon =
-      parseFloat(lonInput.current?.value!) ||
-      map.current?.getCenter()?.lng ||
-      0;
+    const lat = mapData.lat;
+    const lon = mapData.lon;
     try {
-      map.current?.setCenter([lat, lon]);
+      map.setCenter([lat, lon]);
     } catch (e) {
       console.error(e);
     }
@@ -50,38 +67,91 @@ export function EditMap({
 
   return (
     <div className="grid grid-cols-3 gap-1">
-      <span>Zoom</span>
-      <input
-        ref={zoomInput}
+      <Label htmlFor="zoom">Zoom</Label>
+      <Input
         type="number"
-        className="col-span-2 rounded-sm text-center text-black"
+        id="zoom"
+        placeholder="Zoom"
+        value={mapData.zoom}
+        className="col-span-2"
+        onChange={(e) => {
+          const zoom = parseFloat(e.target.value);
+          setMapData({ ...mapData, zoom });
+        }}
         onBlur={() => {
           try {
-            const zoom = parseFloat(zoomInput.current?.value!);
+            const zoom = mapData.zoom;
             if (zoom < 0 || zoom > 20) return;
-            map.current?.setZoom(zoom);
+            map.setZoom(zoom);
           } catch (e) {
             console.error(e);
           }
         }}
       />
-      <span>Center</span>
-      <input
-        ref={latInput}
+      <Label>Center</Label>
+      <Input
         type="number"
-        className="rounded-sm text-center text-black" /* lat */
+        id="lat"
+        placeholder="Latitude"
+        value={mapData.lat}
+        onChange={(e) => {
+          const lat = parseFloat(e.target.value);
+          setMapData({ ...mapData, lat });
+        }}
         onBlur={onPositionInputBlur}
       />
-      <input
-        ref={lonInput}
+      <Input
         type="number"
-        className="rounded-sm text-center text-black" /* lon */
+        id="lon"
+        placeholder="Longitude"
+        value={mapData.lon}
+        onChange={(e) => {
+          const lon = parseFloat(e.target.value);
+          setMapData({ ...mapData, lon });
+        }}
         onBlur={onPositionInputBlur}
       />
-      <span>Rotation</span>
-      <span className="col-span-2">-</span>
-      <span>Tilt</span>
-      <span className="col-span-2">-</span>
+      <Label htmlFor="rotation">Rotation</Label>
+      <Input
+        type="number"
+        id="rotation"
+        placeholder="Rotation"
+        value={mapData.rotation}
+        className="col-span-2"
+        onChange={(e) => {
+          const rotation = parseFloat(e.target.value);
+          setMapData({ ...mapData, rotation });
+        }}
+        onBlur={() => {
+          try {
+            const rotation = mapData.rotation % 360;
+            map.setBearing(rotation);
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
+      <Label htmlFor="tilt">Tilt</Label>
+      <Input
+        type="number"
+        id="tilt"
+        placeholder="Tilt"
+        value={mapData.tilt}
+        className="col-span-2"
+        onChange={(e) => {
+          const tilt = parseFloat(e.target.value);
+          setMapData({ ...mapData, tilt });
+        }}
+        onBlur={() => {
+          try {
+            const tilt = mapData.tilt;
+            if (tilt < 0 || tilt > 60) return;
+            map.setPitch(tilt);
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
     </div>
   );
 }

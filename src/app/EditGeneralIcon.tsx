@@ -69,7 +69,6 @@ export function EditGeneralIcon({
       const type = element.getAttribute("data-type");
       if (type !== "icon") return;
       const style = element.getAttribute("data-style");
-      console.log(style);
       if (!style) return;
       setFormInput(JSON.parse(style));
     } catch (e) {

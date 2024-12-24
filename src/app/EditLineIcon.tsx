@@ -216,6 +216,19 @@ export function EditLineIcon({
         >
           Boat (HH)
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setFormInput({
+              color: "#272c34",
+              text: "Text",
+              shape: "rectangle",
+              scale: 1,
+            });
+          }}
+        >
+          Label
+        </Button>
       </div>
     </div>
   );

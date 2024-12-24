@@ -1,7 +1,5 @@
 import maplibregl from "maplibre-gl";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { set } from "zod";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -11,18 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import { Slider } from "~/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { EditLineIcon } from "./EditLineIcon";
 import { EditGeneralIcon } from "./EditGeneralIcon";
@@ -38,10 +24,14 @@ export function EditElementDialog({
   isOpen,
   marker,
   close,
+  setMarkerList,
 }: {
   isOpen: boolean;
   marker: maplibregl.Marker;
   close: () => void;
+  setMarkerList: Dispatch<
+    SetStateAction<{ id: string; marker: maplibregl.Marker }[]>
+  >;
 }) {
   const [newMarker, setNewMarker] = useState<HTMLElement | null>(null);
   const [defaultScreen, setDefaultScreen] = useState<string>("line");
@@ -101,6 +91,9 @@ export function EditElementDialog({
           <Button
             variant="destructive"
             onClick={() => {
+              setMarkerList((markerList) =>
+                markerList.filter((m) => m.marker !== marker),
+              );
               marker.remove();
               close();
             }}
