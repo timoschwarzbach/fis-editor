@@ -1,7 +1,5 @@
 import maplibregl from "maplibre-gl";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { Button } from "~/components/ui/button";
+import { useEffect, useRef, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -15,6 +13,8 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Slider } from "~/components/ui/slider";
+import { markerStyle } from "./EditElementDialog";
+import { getMarkerData, renderMarkerHtml } from "./RenderMarker";
 
 type formInput = {
   color: string;
@@ -27,22 +27,14 @@ type formInput = {
   rotation: number;
 };
 
-const durationTable: Record<number, string> = {
-  0: "0.5s",
-  1: "1s",
-  2: "2s",
-  3: "5s",
-  4: "10s",
-};
-
 export function EditGeneralIcon({
-  isOpen,
+  active,
   marker,
-  setNewMarker,
+  setData,
 }: {
-  isOpen: boolean;
+  active: boolean;
   marker: maplibregl.Marker;
-  setNewMarker: (marker: HTMLElement) => void;
+  setData: (data: markerStyle) => void;
 }) {
   const defaultForm = {
     color: "#272c34",
@@ -55,34 +47,30 @@ export function EditGeneralIcon({
     rotation: 0,
   };
   const [formInput, setFormInput] = useState<formInput>(defaultForm);
-  const iconPreview = useRef<HTMLDivElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
 
   function updatePreview() {
-    if (!iconPreview.current) return;
-    iconPreview.current.innerHTML = GenerateIconHtml(formInput);
-    setNewMarker(iconPreview.current.firstChild as HTMLElement);
+    if (!preview.current) return;
+    preview.current.innerHTML = renderMarkerHtml("icon", formInput);
+    setData({ type: "icon", data: formInput });
   }
 
-  function loadDefaultStyle() {
+  function loadStyleFromMarker() {
     try {
-      const element = marker.getElement().firstChild as HTMLElement;
-      const type = element.getAttribute("data-type");
-      if (type !== "icon") return;
-      const style = element.getAttribute("data-style");
-      if (!style) return;
-      setFormInput(JSON.parse(style));
-    } catch (e) {
-      console.log("error loading default style");
-      console.error(e);
-    }
+      const { data } = getMarkerData(marker);
+      if (!isIconDataType(data)) {
+        throw "data not in correct format";
+      }
+      setFormInput(data);
+    } catch {}
   }
 
   useEffect(() => {
-    if (isOpen) {
+    if (active) {
       setFormInput(defaultForm);
     }
-    loadDefaultStyle();
-  }, [marker, isOpen]);
+    loadStyleFromMarker();
+  }, [marker, active]);
 
   useEffect(() => {
     updatePreview();
@@ -95,7 +83,7 @@ export function EditGeneralIcon({
           Preview
         </Label>
         <div
-          ref={iconPreview}
+          ref={preview}
           className="col-span-3 flex h-20 items-center justify-center"
         >
           <span>Loading...</span>
@@ -255,29 +243,15 @@ export function EditGeneralIcon({
   );
 }
 
-function GenerateIconHtml(data: formInput) {
-  return renderToStaticMarkup(
-    <div
-      data-type="icon"
-      data-style={JSON.stringify(data)}
-      style={{
-        backgroundColor: data.color,
-        scale: data.scale,
-        rotate: data.rotation + "deg",
-      }}
-      className="flex h-16 w-16 justify-center rounded-full bg-primary p-4 align-middle text-lg font-bold text-white"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 384 512"
-        style={{
-          animationName: data.animated ? "bounce-arrow" : "none",
-          animationDuration: durationTable[4 - data.duration],
-        }}
-        className="animate-bounce-arrow fill-white"
-      >
-        <path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2 160 448c0 17.7 14.3 32 32 32s32-14.3 32-32l0-306.7L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z" />
-      </svg>
-    </div>,
+function isIconDataType(data: any): data is formInput {
+  return (
+    typeof data.color === "string" &&
+    typeof data.stroke === "string" &&
+    typeof data.icon === "string" &&
+    typeof data.shape === "string" &&
+    typeof data.animated === "boolean" &&
+    typeof data.duration === "number" &&
+    typeof data.scale === "number" &&
+    typeof data.rotation === "number"
   );
 }

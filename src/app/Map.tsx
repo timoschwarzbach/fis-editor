@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { EditMap } from "./EditMap";
 import { AddElement } from "./AddElement";
 import { Sidebar } from "./Sidebar";
+import { MarkerLogicList } from "./MarkerLogic";
 
 export type markerItem = { id: string; marker: maplibregl.Marker };
 
@@ -42,6 +43,13 @@ export default function Map() {
         {map && <AddElement map={map} setMarkerList={setMarkerList} />}
         {map && (
           <Sidebar
+            map={map}
+            markerList={markerList}
+            setMarkerList={setMarkerList}
+          />
+        )}
+        {map && (
+          <MarkerLogicList
             map={map}
             markerList={markerList}
             setMarkerList={setMarkerList}

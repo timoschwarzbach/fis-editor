@@ -1,6 +1,5 @@
 import maplibregl from "maplibre-gl";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -14,6 +13,8 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Slider } from "~/components/ui/slider";
+import { markerStyle } from "./EditElementDialog";
+import { getMarkerData, renderMarkerHtml } from "./RenderMarker";
 
 type formInput = {
   color: string;
@@ -23,13 +24,13 @@ type formInput = {
 };
 
 export function EditLineIcon({
-  isOpen,
+  active,
   marker,
-  setNewMarker,
+  setData,
 }: {
-  isOpen: boolean;
+  active: boolean;
   marker: maplibregl.Marker;
-  setNewMarker: (marker: HTMLElement) => void;
+  setData: (data: markerStyle) => void;
 }) {
   const defaultForm = {
     color: "#ff0000",
@@ -38,34 +39,30 @@ export function EditLineIcon({
     scale: 1,
   };
   const [formInput, setFormInput] = useState<formInput>(defaultForm);
-  const iconPreview = useRef<HTMLDivElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
 
   function updatePreview() {
-    if (!iconPreview.current) return;
-    iconPreview.current.innerHTML = GenerateIconHtml(formInput);
-    setNewMarker(iconPreview.current.firstChild as HTMLElement);
+    if (!preview.current) return;
+    preview.current.innerHTML = renderMarkerHtml("label", formInput);
+    setData({ type: "label", data: formInput });
   }
 
-  function loadDefaultStyle() {
+  function loadStyleFromMarker() {
     try {
-      const element = marker.getElement().firstChild as HTMLElement;
-      const type = element.getAttribute("data-type");
-      if (type !== "label") return;
-      const style = element.getAttribute("data-style");
-      if (!style) return;
-      setFormInput(JSON.parse(style));
-    } catch (e) {
-      console.log("error loading default style");
-      console.error(e);
-    }
+      const { data } = getMarkerData(marker);
+      if (!isLabelDataType(data)) {
+        throw "data not in correct format";
+      }
+      setFormInput(data);
+    } catch {}
   }
 
   useEffect(() => {
-    if (isOpen) {
+    if (active) {
       setFormInput(defaultForm);
     }
-    loadDefaultStyle();
-  }, [marker, isOpen]);
+    loadStyleFromMarker();
+  }, [marker, active]);
 
   useEffect(() => {
     updatePreview();
@@ -78,7 +75,7 @@ export function EditLineIcon({
           Preview
         </Label>
         <div
-          ref={iconPreview}
+          ref={preview}
           className="col-span-3 flex h-20 items-center justify-center"
         >
           <span>Loading...</span>
@@ -234,51 +231,11 @@ export function EditLineIcon({
   );
 }
 
-const TrapezoidStyle = {
-  paddingTop: 0,
-  paddingBottom: 0,
-  WebkitClipPath:
-    "polygon(80% 0, 100% 50%, 80% 100%, 20% 100%, 0% 50%, 20% 0%)",
-  clipPath: "polygon(80% 0, 100% 50%, 80% 100%, 20% 100%, 0% 50%, 20% 0%)",
-};
-const FerryStyle = {
-  WebkitClipPath: "polygon(0 0, 100% 0, 80% 100%, 20% 100%)",
-  clipPath: "polygon(0 0, 100% 0, 80% 100%, 20% 100%)",
-};
-const RoundedStyle = {
-  borderRadius: 9999,
-};
-
-const ShapeStyles: Record<string, CSSProperties> = {
-  trapezoid: TrapezoidStyle,
-  ferry: FerryStyle,
-  rounded: RoundedStyle,
-};
-
-function GenerateIconHtml({
-  color,
-  text,
-  shape,
-  scale,
-}: {
-  color: string;
-  text: string;
-  shape: string;
-  scale: number;
-}) {
-  return renderToStaticMarkup(
-    <div
-      data-type="label"
-      data-style={JSON.stringify({
-        color: color,
-        text: text,
-        shape: shape,
-        scale: scale,
-      })}
-      style={{ backgroundColor: color, scale, ...ShapeStyles[shape] }}
-      className="px-4 py-1 text-lg font-bold text-white"
-    >
-      {text}
-    </div>,
+function isLabelDataType(data: any): data is formInput {
+  return (
+    typeof data.color === "string" &&
+    typeof data.text === "string" &&
+    typeof data.shape === "string" &&
+    typeof data.scale === "number"
   );
 }

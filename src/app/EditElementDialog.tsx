@@ -12,12 +12,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { EditLineIcon } from "./EditLineIcon";
 import { EditGeneralIcon } from "./EditGeneralIcon";
+import { getMarkerData, renderMarkerHtml } from "./RenderMarker";
 
-type formInput = {
-  color: string;
-  text: string;
-  shape: string;
-  scale: number;
+export type markerStyle = {
+  type: string;
+  data: object;
 };
 
 export function EditElementDialog({
@@ -33,26 +32,22 @@ export function EditElementDialog({
     SetStateAction<{ id: string; marker: maplibregl.Marker }[]>
   >;
 }) {
-  const [newMarker, setNewMarker] = useState<HTMLElement | null>(null);
-  const [defaultScreen, setDefaultScreen] = useState<string>("line");
-
-  function loadCorrectScreen() {
-    try {
-      const element = marker.getElement().firstChild as HTMLElement;
-      const type = element.getAttribute("data-type");
-      if (!type) return;
-      setDefaultScreen(type);
-    } catch (e) {
-      console.log("error loading screen");
-      console.error(e);
-    }
-  }
+  const [data, setData] = useState<markerStyle | null>(null);
+  const [screen, setScreen] = useState<string>("line");
 
   useEffect(() => {
     if (isOpen) {
-      loadCorrectScreen();
+      // try to set the screen to the correct one according to the marker
+      const { type } = getMarkerData(marker);
+      if (type !== "") {
+        setScreen(type);
+      }
     }
   }, [isOpen, marker]);
+
+  // if (screen === "layout") {
+  //   return <>layout todo</>;
+  // }
 
   return (
     <Dialog defaultOpen open={isOpen} onOpenChange={close}>
@@ -63,7 +58,7 @@ export function EditElementDialog({
             Lorem ipsum dolor sit amet consectetur adipisicing elit. Fuga, rem?
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue={defaultScreen}>
+        <Tabs defaultValue={screen}>
           <TabsList>
             <TabsTrigger value="line" key="line">
               Line
@@ -75,15 +70,15 @@ export function EditElementDialog({
           <TabsContent value="line">
             <EditLineIcon
               marker={marker}
-              isOpen={isOpen}
-              setNewMarker={setNewMarker}
+              active={screen === "line"}
+              setData={setData}
             />
           </TabsContent>
           <TabsContent value="icon">
             <EditGeneralIcon
               marker={marker}
-              isOpen={isOpen}
-              setNewMarker={setNewMarker}
+              active={screen === "icon"}
+              setData={setData}
             />
           </TabsContent>
         </Tabs>
@@ -103,8 +98,9 @@ export function EditElementDialog({
           <Button
             type="submit"
             onClick={() => {
-              if (!newMarker) return;
-              changeMarker(marker, newMarker);
+              if (!data) return;
+              const html = renderMarkerHtml(data.type, data.data);
+              replaceMarkerHtml(marker, html);
               close();
             }}
           >
@@ -116,8 +112,8 @@ export function EditElementDialog({
   );
 }
 
-function changeMarker(marker: maplibregl.Marker, newElement: HTMLElement) {
-  const element = marker.getElement().firstChild;
-  if (!element) throw "No html";
-  element.replaceWith(newElement);
+function replaceMarkerHtml(marker: maplibregl.Marker, html: string) {
+  const element = marker.getElement();
+  if (!element) throw "no html";
+  element.innerHTML = html;
 }
