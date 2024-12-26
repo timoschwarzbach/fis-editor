@@ -1,5 +1,6 @@
 import { CSSProperties } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { markerStyle } from "./EditElementDialog";
 
 export type exportMarker = {
   lat: number;
@@ -31,31 +32,27 @@ const ShapeStyles: Record<string, CSSProperties> = {
   rounded: RoundedStyle,
 };
 
-function renderLineIcon({
-  color,
-  text,
-  shape,
-  scale,
-}: {
+export function renderLineIcon(data: {
   color: string;
   text: string;
   shape: string;
   scale: number;
+  key?: any;
 }) {
-  return renderToStaticMarkup(
+  return (
     <div
+      key={data.key}
       data-type="label"
-      data-style={JSON.stringify({
-        color: color,
-        text: text,
-        shape: shape,
-        scale: scale,
-      })}
-      style={{ backgroundColor: color, scale, ...ShapeStyles[shape] }}
+      data-style={JSON.stringify(data)}
+      style={{
+        backgroundColor: data.color,
+        scale: data.scale,
+        ...ShapeStyles[data.shape],
+      }}
       className="px-4 py-1 text-lg font-bold text-white"
     >
-      {text}
-    </div>,
+      {data.text}
+    </div>
   );
 }
 
@@ -68,7 +65,7 @@ const durationTable: Record<number, string> = {
   4: "10s",
 };
 
-function renderGeneralIcon(data: {
+export function renderGeneralIcon(data: {
   color: string;
   stroke: string;
   icon: string;
@@ -77,9 +74,11 @@ function renderGeneralIcon(data: {
   duration: number;
   scale: number;
   rotation: number;
+  key?: any;
 }) {
-  return renderToStaticMarkup(
+  return (
     <div
+      key={data.key}
       data-type="icon"
       data-style={JSON.stringify(data)}
       style={{
@@ -100,7 +99,7 @@ function renderGeneralIcon(data: {
       >
         <path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2 160 448c0 17.7 14.3 32 32 32s32-14.3 32-32l0-306.7L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z" />
       </svg>
-    </div>,
+    </div>
   );
 }
 
@@ -108,10 +107,12 @@ function renderGeneralIcon(data: {
 export function renderLayout(data: {
   direction: "row" | "column";
   gap: number;
-  items: exportMarker[];
+  items: markerStyle[];
+  key?: any;
 }) {
-  return renderToStaticMarkup(
+  return (
     <div
+      key={data.key}
       data-type="layout"
       data-style={JSON.stringify(data)}
       style={{
@@ -124,31 +125,25 @@ export function renderLayout(data: {
     >
       {data.items.map((marker, index) => {
         try {
-          return (
-            <div
-              key={index}
-              dangerouslySetInnerHTML={{
-                __html: renderTable[marker.type]!(marker.data),
-              }}
-            />
-          );
-        } catch {
+          return renderTable[marker.type]!({ ...marker.data, key: index });
+        } catch (e) {
+          console.log("error rendering marker", e);
           return <>error rendering marker</>;
         }
       })}
-    </div>,
+    </div>
   );
 }
 
 /* renderTable */
-const renderTable: Record<string, (data: any) => string> = {
+const renderTable: Record<string, (data: any) => JSX.Element> = {
   label: renderLineIcon,
   icon: renderGeneralIcon,
   layout: renderLayout,
 };
-export function renderMarkerHtml(type: string, data: any) {
+export function renderMarkerHtml(type: string, data: any): string {
   try {
-    return renderTable[type]!(data);
+    return renderToStaticMarkup(renderTable[type]!(data));
   } catch (e) {
     return "error rendering marker";
   }
@@ -158,16 +153,10 @@ export function renderMarkerHtml(type: string, data: any) {
 export function renderMarkerToJsx(marker: maplibregl.Marker) {
   try {
     const element = marker.getElement().firstChild as HTMLElement;
-    const markertype = element.getAttribute("data-type");
-    const style = JSON.parse(element.getAttribute("data-style")!);
-    if (!markertype || !style) throw "not a marker";
-    return (
-      <div
-        dangerouslySetInnerHTML={{
-          __html: renderMarkerHtml(markertype, style),
-        }}
-      />
-    );
+    const type = element.getAttribute("data-type");
+    const data = JSON.parse(element.getAttribute("data-style")!);
+    if (!type || !data) throw "not a marker";
+    return renderTable[type]!(data);
   } catch {
     return <>error rendering marker</>;
   }
@@ -185,7 +174,7 @@ export function getMarkerData(marker: maplibregl.Marker): exportMarker {
       data: style ?? {},
     };
   } catch (e) {
-    console.log("error reading style from marker");
+    console.log("error reading style from marker", e);
     return {
       lat: 0,
       lon: 0,

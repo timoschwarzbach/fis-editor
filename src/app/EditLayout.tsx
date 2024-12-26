@@ -1,24 +1,38 @@
-import maplibregl from "maplibre-gl";
-import { useEffect, useRef, useState } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import {
+  Dispatch,
+  MutableRefObject,
+  SetStateAction,
+  useEffect,
+  useState,
+} from "react";
 import { Label } from "~/components/ui/label";
-import { exportMarker, getMarkerData, renderMarkerHtml } from "./RenderMarker";
-import { markerStyle } from "./EditElementDialog";
+import { renderMarkerHtml } from "./RenderMarker";
+import { EditElementDialog, markerStyle } from "./EditElementDialog";
+import { Button } from "~/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 type formInput = {
   direction: "row" | "column";
   gap: number;
-  items: exportMarker[];
+  items: markerStyle[];
 };
 
 export function EditLayout({
   active,
   marker,
-  setData,
+  output,
 }: {
   active: boolean;
-  marker: maplibregl.Marker;
-  setData: (data: markerStyle) => void;
+  marker: markerStyle;
+  output: MutableRefObject<markerStyle>;
 }) {
   const defaultForm = {
     direction: "row" as "row" | "column",
@@ -26,24 +40,16 @@ export function EditLayout({
     items: [],
   };
   const [formInput, setFormInput] = useState<formInput>(defaultForm);
-  const preview = useRef<HTMLDivElement>(null);
 
-  function updatePreview() {
-    if (!preview.current) return;
-    preview.current.innerHTML = renderLayoutFirstLevelDraggable(formInput);
-    setData({ type: "layout", data: formInput });
-  }
-
+  // load the form from current data
   function loadStyleFromMarker() {
     try {
-      const { data } = getMarkerData(marker);
-      if (!isLayoutDataType(data)) {
+      if (!isLayoutDataType(marker.data)) {
         throw "data not in correct format";
       }
-      setFormInput(data);
+      setFormInput(marker.data);
     } catch {}
   }
-
   useEffect(() => {
     if (active) {
       setFormInput(defaultForm);
@@ -51,33 +57,61 @@ export function EditLayout({
     loadStyleFromMarker();
   }, [marker, active]);
 
+  // update parent dialog's data when form changes
   useEffect(() => {
-    updatePreview();
+    output.current = { type: "layout", data: formInput };
   }, [formInput]);
 
   return (
     <div className="grid gap-4 py-4">
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor="preview" className="text-right">
-          Preview
+          Preview layout
         </Label>
-        <div
-          ref={preview}
-          className="col-span-3 flex h-20 items-center justify-center"
-        >
-          <span>Loading...</span>
+        <div className="col-span-3 flex h-20 items-center justify-center">
+          <LayoutFirstLevelDraggable data={formInput} update={setFormInput} />
         </div>
+      </div>
+      <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor="direction" className="text-right">
+          Direction
+        </Label>
+        <Select
+          onValueChange={(value) => {
+            if (value === "row" || value === "column") {
+              setFormInput({ ...formInput, direction: value });
+            }
+          }}
+          value={formInput.direction}
+        >
+          <SelectTrigger className="col-span-3">
+            <SelectValue id="icon" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Direction</SelectLabel>
+              <SelectItem value="row">Horizontal</SelectItem>
+              <SelectItem value="column">Vertical</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
 }
 
-function renderLayoutFirstLevelDraggable(data: {
-  direction: "row" | "column";
-  gap: number;
-  items: exportMarker[];
+function LayoutFirstLevelDraggable({
+  update,
+  data,
+}: {
+  update: Dispatch<SetStateAction<formInput>>;
+  data: {
+    direction: "row" | "column";
+    gap: number;
+    items: markerStyle[];
+  };
 }) {
-  return renderToStaticMarkup(
+  return (
     <div
       data-type="layout"
       data-style={JSON.stringify(data)}
@@ -89,21 +123,66 @@ function renderLayoutFirstLevelDraggable(data: {
         gap: data.gap,
       }}
     >
-      {data.items.map((marker, index) => {
-        try {
-          return (
-            <div
-              key={index}
-              dangerouslySetInnerHTML={{
-                __html: renderMarkerHtml(marker.type, marker.data),
-              }}
-            />
-          );
-        } catch {
-          return <>error rendering marker</>;
-        }
-      })}
-    </div>,
+      {data.items.map((marker, index) => (
+        <LayoutElement
+          key={index}
+          item={marker}
+          index={index}
+          update={update}
+        />
+      ))}
+    </div>
+  );
+}
+
+function LayoutElement({
+  item,
+  index,
+  update,
+}: {
+  item: markerStyle;
+  index: number;
+  update: Dispatch<SetStateAction<formInput>>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant="outline"
+        className="p-2"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        <div
+          dangerouslySetInnerHTML={{
+            __html: renderMarkerHtml(item.type, item.data),
+          }}
+        />
+      </Button>
+      <EditElementDialog
+        isOpen={open}
+        pseudoMarker={item}
+        close={() => {
+          setOpen(false);
+        }}
+        change={(marker) => {
+          if (!marker) {
+            // remove marker
+            update((prev) => ({
+              ...prev,
+              items: prev.items.filter((_, i) => i !== index),
+            }));
+          } else {
+            // update marker
+            update((prev) => ({
+              ...prev,
+              items: prev.items.map((m, i) => (i === index ? marker : m)),
+            }));
+          }
+        }}
+      />
+    </>
   );
 }
 

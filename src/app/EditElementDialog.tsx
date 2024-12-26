@@ -1,5 +1,12 @@
 import maplibregl from "maplibre-gl";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -13,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { EditLineIcon } from "./EditLineIcon";
 import { EditGeneralIcon } from "./EditGeneralIcon";
 import { getMarkerData, renderMarkerHtml } from "./RenderMarker";
+import { EditLayout } from "./EditLayout";
 
 export type markerStyle = {
   type: string;
@@ -22,32 +30,51 @@ export type markerStyle = {
 export function EditElementDialog({
   isOpen,
   marker,
+  pseudoMarker,
   close,
   setMarkerList,
-}: {
-  isOpen: boolean;
-  marker: maplibregl.Marker;
-  close: () => void;
-  setMarkerList: Dispatch<
-    SetStateAction<{ id: string; marker: maplibregl.Marker }[]>
-  >;
-}) {
-  const [data, setData] = useState<markerStyle | null>(null);
+  change,
+}:
+  | {
+      isOpen: boolean;
+      marker: maplibregl.Marker;
+      pseudoMarker?: undefined;
+      close: () => void;
+      setMarkerList: Dispatch<
+        SetStateAction<{ id: string; marker: maplibregl.Marker }[]>
+      >;
+      change?: undefined;
+    }
+  | {
+      isOpen: boolean;
+      marker?: undefined;
+      pseudoMarker: markerStyle;
+      close: () => void;
+      setMarkerList?: undefined;
+      change: (marker: markerStyle | null) => void;
+    }) {
+  const output = useRef<markerStyle>({ type: "", data: {} }); // this is output
   const [screen, setScreen] = useState<string>("line");
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && marker) {
       // try to set the screen to the correct one according to the marker
       const { type } = getMarkerData(marker);
       if (type !== "") {
         setScreen(type);
       }
     }
-  }, [isOpen, marker]);
+    if (isOpen && pseudoMarker) {
+      setScreen(pseudoMarker.type);
+    }
+  }, [isOpen, marker, pseudoMarker]);
 
-  // if (screen === "layout") {
-  //   return <>layout todo</>;
-  // }
+  const getMarker = useCallback(() => {
+    if (marker) {
+      return getMarkerData(marker) as markerStyle;
+    }
+    return pseudoMarker;
+  }, []);
 
   return (
     <Dialog defaultOpen open={isOpen} onOpenChange={close}>
@@ -66,19 +93,29 @@ export function EditElementDialog({
             <TabsTrigger value="icon" key="icon">
               Icon
             </TabsTrigger>
+            <TabsTrigger value="layout" key="layout">
+              Layout
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="line">
             <EditLineIcon
-              marker={marker}
+              marker={getMarker()}
               active={screen === "line"}
-              setData={setData}
+              output={output}
             />
           </TabsContent>
           <TabsContent value="icon">
             <EditGeneralIcon
-              marker={marker}
+              marker={getMarker()}
               active={screen === "icon"}
-              setData={setData}
+              output={output}
+            />
+          </TabsContent>
+          <TabsContent value="layout">
+            <EditLayout
+              marker={getMarker()}
+              active={screen === "layout"}
+              output={output}
             />
           </TabsContent>
         </Tabs>
@@ -86,11 +123,17 @@ export function EditElementDialog({
           <Button
             variant="destructive"
             onClick={() => {
-              setMarkerList((markerList) =>
-                markerList.filter((m) => m.marker !== marker),
-              );
-              marker.remove();
-              close();
+              if (marker) {
+                setMarkerList((markerList) =>
+                  markerList.filter((m) => m.marker !== marker),
+                );
+                marker.remove();
+                close();
+              }
+              if (pseudoMarker) {
+                change(null);
+                close();
+              }
             }}
           >
             Delete
@@ -98,10 +141,19 @@ export function EditElementDialog({
           <Button
             type="submit"
             onClick={() => {
-              if (!data) return;
-              const html = renderMarkerHtml(data.type, data.data);
-              replaceMarkerHtml(marker, html);
-              close();
+              if (marker) {
+                if (!output) return;
+                const html = renderMarkerHtml(
+                  output.current.type,
+                  output.current.data,
+                );
+                replaceMarkerHtml(marker, html);
+                close();
+              }
+              if (pseudoMarker) {
+                change(output.current);
+                close();
+              }
             }}
           >
             Save changes

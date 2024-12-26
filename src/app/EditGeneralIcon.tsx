@@ -1,5 +1,4 @@
-import maplibregl from "maplibre-gl";
-import { useEffect, useRef, useState } from "react";
+import { MutableRefObject, useEffect, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -14,7 +13,7 @@ import {
 } from "~/components/ui/select";
 import { Slider } from "~/components/ui/slider";
 import { markerStyle } from "./EditElementDialog";
-import { getMarkerData, renderMarkerHtml } from "./RenderMarker";
+import { renderGeneralIcon } from "./RenderMarker";
 
 type formInput = {
   color: string;
@@ -30,11 +29,11 @@ type formInput = {
 export function EditGeneralIcon({
   active,
   marker,
-  setData,
+  output,
 }: {
   active: boolean;
-  marker: maplibregl.Marker;
-  setData: (data: markerStyle) => void;
+  marker: markerStyle;
+  output: MutableRefObject<markerStyle>;
 }) {
   const defaultForm = {
     color: "#272c34",
@@ -47,24 +46,16 @@ export function EditGeneralIcon({
     rotation: 0,
   };
   const [formInput, setFormInput] = useState<formInput>(defaultForm);
-  const preview = useRef<HTMLDivElement>(null);
 
-  function updatePreview() {
-    if (!preview.current) return;
-    preview.current.innerHTML = renderMarkerHtml("icon", formInput);
-    setData({ type: "icon", data: formInput });
-  }
-
+  // load the form from current data
   function loadStyleFromMarker() {
     try {
-      const { data } = getMarkerData(marker);
-      if (!isIconDataType(data)) {
+      if (!isIconDataType(marker.data)) {
         throw "data not in correct format";
       }
-      setFormInput(data);
+      setFormInput(marker.data);
     } catch {}
   }
-
   useEffect(() => {
     if (active) {
       setFormInput(defaultForm);
@@ -72,8 +63,9 @@ export function EditGeneralIcon({
     loadStyleFromMarker();
   }, [marker, active]);
 
+  // update parent dialog's data when form changes
   useEffect(() => {
-    updatePreview();
+    output.current = { type: "icon", data: formInput };
   }, [formInput]);
 
   return (
@@ -82,11 +74,8 @@ export function EditGeneralIcon({
         <Label htmlFor="preview" className="text-right">
           Preview
         </Label>
-        <div
-          ref={preview}
-          className="col-span-3 flex h-20 items-center justify-center"
-        >
-          <span>Loading...</span>
+        <div className="col-span-3 flex h-20 items-center justify-center">
+          {renderGeneralIcon(formInput)}
         </div>
       </div>
       <div className="grid grid-cols-4 items-center gap-4">

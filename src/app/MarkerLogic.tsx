@@ -15,7 +15,12 @@ import {
 } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { DialogDescription } from "@radix-ui/react-dialog";
-import { getMarkerData, renderLayout, renderMarkerToJsx } from "./RenderMarker";
+import {
+  getMarkerData,
+  renderLayout,
+  renderMarkerHtml,
+  renderMarkerToJsx,
+} from "./RenderMarker";
 import { EditElementDialog } from "./EditElementDialog";
 import maplibregl from "maplibre-gl";
 
@@ -170,7 +175,7 @@ function MergeDialog({
       .setLngLat([m2.lon, m2.lat])
       .addTo(map);
     // set marker to layout
-    marker.getElement().innerHTML = renderLayout({
+    marker.getElement().innerHTML = renderMarkerHtml("layout", {
       direction: "row",
       gap: 4,
       items: [m1, m2],
